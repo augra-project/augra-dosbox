@@ -855,4 +855,38 @@ std::filesystem::path ConfAnchor()
 	return control->loaded_config_paths_canonical.back().parent_path();
 }
 
+const char* DenyReasonText(const DenyReason reason)
+{
+	switch (reason) {
+	case DenyReason::None: return "";
+	case DenyReason::DoesNotResolve: return "path does not resolve";
+	case DenyReason::NotRegularFile: return "not a regular file";
+	case DenyReason::SymlinkComponent: return "symlink in path";
+	case DenyReason::SystemPath: return "system path";
+	case DenyReason::OutsideWhitelist: return "outside allowed directories";
+	case DenyReason::NotADiskImage: return "not a recognized disk image";
+	case DenyReason::NotADirectory: return "not a directory";
+	case DenyReason::ReservedDeviceName: return "reserved device name";
+	}
+	return "";
+}
+
+const char* DenyMessageId(const DenyReason reason)
+{
+	switch (reason) {
+	case DenyReason::None: return "";
+	case DenyReason::DoesNotResolve: return "PROGRAM_MOUNT_ERROR_1";
+	case DenyReason::NotRegularFile:
+	case DenyReason::NotADiskImage:
+	case DenyReason::NotADirectory: return "PROGRAM_MOUNT_ERROR_2";
+	case DenyReason::SymlinkComponent:
+		return "PROGRAM_MOUNT_POLICY_SYMLINK";
+	case DenyReason::SystemPath:
+	case DenyReason::OutsideWhitelist:
+	case DenyReason::ReservedDeviceName:
+		return "PROGRAM_MOUNT_POLICY_REFUSED";
+	}
+	return "";
+}
+
 } // namespace MountPolicy

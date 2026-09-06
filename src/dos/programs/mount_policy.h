@@ -118,6 +118,10 @@ struct PolicyPaths {
 };
 PolicyPaths ParsePolicyConfig(const std::filesystem::path& config_path);
 
+// A folder that exists must never be reported as missing.
+const char* DenyReasonText(DenyReason reason);
+const char* DenyMessageId(DenyReason reason);
+
 } // namespace MountPolicy
 
 #endif // DOSBOX_PROGRAM_MOUNT_POLICY_H

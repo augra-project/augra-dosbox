@@ -11276,3 +11276,27 @@ msgctxt "HELP_UTIL_CATEGORY_UNKNOWN"
 msgid "Unknown Command"
 msgstr "Comando desconocido"
 
+
+#: src/dos/programs/mount.cpp
+#, c-format, no-wrap
+msgctxt "PROGRAM_MOUNT_POLICY_REFUSED"
+msgid ""
+"%s was refused by the mount policy: %s.\n"
+"Put a dosbox-automation.conf next to the game and start with -conf,\n"
+"or add the path to mount_allowed_bases in the primary config.\n"
+"The security page of the manual explains the policy.\n"
+msgstr ""
+"%s fue rechazado por la política de montaje: %s.\n"
+"Coloca un dosbox-automation.conf junto al juego e inicia con -conf,\n"
+"o añade la ruta a mount_allowed_bases en la configuración principal.\n"
+"La página de seguridad del manual explica la política.\n"
+
+#: src/dos/programs/mount.cpp
+#, c-format, no-wrap
+msgctxt "PROGRAM_MOUNT_POLICY_SYMLINK"
+msgid ""
+"%s was refused by the mount policy: a link is in the path.\n"
+"Mount the real directory the link points to instead.\n"
+msgstr ""
+"%s fue rechazado por la política de montaje: hay un enlace en la ruta.\n"
+"Monta en su lugar el directorio real al que apunta el enlace.\n"

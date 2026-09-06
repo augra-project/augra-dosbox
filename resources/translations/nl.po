@@ -13955,3 +13955,27 @@ msgctxt "HELP_UTIL_CATEGORY_UNKNOWN"
 msgid "Unknown Command"
 msgstr "Onbekende opdracht"
 
+
+#: src/dos/programs/mount.cpp
+#, c-format, no-wrap
+msgctxt "PROGRAM_MOUNT_POLICY_REFUSED"
+msgid ""
+"%s was refused by the mount policy: %s.\n"
+"Put a dosbox-automation.conf next to the game and start with -conf,\n"
+"or add the path to mount_allowed_bases in the primary config.\n"
+"The security page of the manual explains the policy.\n"
+msgstr ""
+"%s is geweigerd door het mountbeleid: %s.\n"
+"Zet een dosbox-automation.conf naast het spel en start met -conf,\n"
+"of voeg het pad toe aan mount_allowed_bases in de hoofdconfiguratie.\n"
+"De beveiligingspagina van de handleiding legt het beleid uit.\n"
+
+#: src/dos/programs/mount.cpp
+#, c-format, no-wrap
+msgctxt "PROGRAM_MOUNT_POLICY_SYMLINK"
+msgid ""
+"%s was refused by the mount policy: a link is in the path.\n"
+"Mount the real directory the link points to instead.\n"
+msgstr ""
+"%s is geweigerd door het mountbeleid: er zit een koppeling in het pad.\n"
+"Mount in plaats daarvan de echte map waar de koppeling naar wijst.\n"

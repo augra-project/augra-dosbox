@@ -1053,33 +1053,26 @@ static DirMountPolicy GetCurrentDirPolicy()
 	return DirMountPolicy::OwnerTrusted;
 }
 
-static void LogMountDenied(const std::string& path, const MountVerdict& verdict)
+static void ReportMountDenied(const std::string& path, const MountVerdict& verdict)
 {
-	const char* reason_text = "blocked by policy";
-	switch (verdict.reason) {
-	case DenyReason::DoesNotResolve:
-		reason_text = "path does not resolve";
-		break;
-	case DenyReason::NotRegularFile:
-		reason_text = "not a regular file";
-		break;
-	case DenyReason::SymlinkComponent:
-		reason_text = "symlink in path";
-		break;
-	case DenyReason::SystemPath: reason_text = "system path"; break;
-	case DenyReason::OutsideWhitelist:
-		reason_text = "outside allowed directories";
-		break;
-	case DenyReason::NotADiskImage:
-		reason_text = "not a recognized disk image";
-		break;
-	case DenyReason::NotADirectory: reason_text = "not a directory"; break;
-	case DenyReason::ReservedDeviceName:
-		reason_text = "reserved device name";
-		break;
-	case DenyReason::None: return;
+	if (verdict.reason == DenyReason::None) {
+		return;
 	}
+	const auto reason_text = MountPolicy::DenyReasonText(verdict.reason);
 	LOG_WARNING("MOUNT: Blocked '%s' - %s", path.c_str(), reason_text);
+	const std::string message_id = MountPolicy::DenyMessageId(verdict.reason);
+	if (message_id == "PROGRAM_MOUNT_POLICY_REFUSED") {
+		NOTIFY_DisplayWarning(Notification::Source::Console,
+		                      "MOUNT",
+		                      message_id,
+		                      path.c_str(),
+		                      reason_text);
+	} else {
+		NOTIFY_DisplayWarning(Notification::Source::Console,
+		                      "MOUNT",
+		                      message_id,
+		                      path.c_str());
+	}
 }
 
 // Process paths and prepare (mutate) the passed `MountParameters` for
@@ -1311,11 +1304,7 @@ bool MOUNT::MountPaths(MountParameters& params)
 			        MountPolicy::AllowedImageRoots(),
 			        MountPolicy::ConfAnchor());
 			if (!img_verdict.allowed) {
-				LogMountDenied(img_path, img_verdict);
-				NOTIFY_DisplayWarning(Notification::Source::Console,
-				                      "MOUNT",
-				                      "PROGRAM_MOUNT_ERROR_2",
-				                      img_path.c_str());
+				ReportMountDenied(img_path, img_verdict);
 				return false;
 			}
 			img_path = img_verdict.resolved.string();
@@ -1334,11 +1323,7 @@ bool MOUNT::MountPaths(MountParameters& params)
 		        MountPolicy::AllowedBases(),
 		        GetCurrentDirPolicy());
 		if (!dir_verdict.allowed) {
-			LogMountDenied(params.paths[0], dir_verdict);
-			NOTIFY_DisplayWarning(Notification::Source::Console,
-			                      "MOUNT",
-			                      "PROGRAM_MOUNT_ERROR_2",
-			                      params.paths[0].c_str());
+			ReportMountDenied(params.paths[0], dir_verdict);
 			return false;
 		}
 
@@ -1691,6 +1676,15 @@ void MOUNT::AddMessages()
 
 	MSG_Add("PROGRAM_MOUNT_ERROR_2",
 	        "%s isn't a directory or valid image file.\n");
+
+	MSG_Add("PROGRAM_MOUNT_POLICY_REFUSED",
+	        "%s was refused by the mount policy: %s.\n"
+	        "Put a dosbox-automation.conf next to the game and start with -conf,\n"
+	        "or add the path to mount_allowed_bases in the primary config.\n"
+	        "The security page of the manual explains the policy.\n");
+	MSG_Add("PROGRAM_MOUNT_POLICY_SYMLINK",
+	        "%s was refused by the mount policy: a link is in the path.\n"
+	        "Mount the real directory the link points to instead.\n");
 
 	MSG_Add("PROGRAM_MOUNT_ILL_TYPE", "Illegal type %s");
 	MSG_Add("PROGRAM_MOUNT_UNKNOWN_OPTION", "Unknown option: %s\n");

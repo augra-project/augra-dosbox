@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <set>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -1402,3 +1403,48 @@ TEST(MountPolicyWindows, DeviceNamespacePathRejected)
 #endif // WIN32
 
 } // namespace
+
+// A folder that exists must never be reported as missing (Vivalinux, 2026-09-06).
+TEST(MountPolicyMessages, EveryDenyReasonHasDistinctText)
+{
+	const std::array reasons   = {DenyReason::DoesNotResolve,
+	                              DenyReason::NotRegularFile,
+	                              DenyReason::SymlinkComponent,
+	                              DenyReason::SystemPath,
+	                              DenyReason::OutsideWhitelist,
+	                              DenyReason::NotADiskImage,
+	                              DenyReason::NotADirectory,
+	                              DenyReason::ReservedDeviceName};
+	std::set<std::string> seen = {};
+	for (const auto reason : reasons) {
+		const std::string text = MountPolicy::DenyReasonText(reason);
+		EXPECT_FALSE(text.empty());
+		EXPECT_TRUE(seen.insert(text).second) << text;
+	}
+	EXPECT_STREQ(MountPolicy::DenyReasonText(DenyReason::None), "");
+}
+
+TEST(MountPolicyMessages, ExistenceReasonsKeepTheirPlainMessages)
+{
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::DoesNotResolve),
+	             "PROGRAM_MOUNT_ERROR_1");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::NotADirectory),
+	             "PROGRAM_MOUNT_ERROR_2");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::NotADiskImage),
+	             "PROGRAM_MOUNT_ERROR_2");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::NotRegularFile),
+	             "PROGRAM_MOUNT_ERROR_2");
+}
+
+TEST(MountPolicyMessages, PolicyReasonsGetTheRefusedMessage)
+{
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::OutsideWhitelist),
+	             "PROGRAM_MOUNT_POLICY_REFUSED");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::SystemPath),
+	             "PROGRAM_MOUNT_POLICY_REFUSED");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::ReservedDeviceName),
+	             "PROGRAM_MOUNT_POLICY_REFUSED");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::SymlinkComponent),
+	             "PROGRAM_MOUNT_POLICY_SYMLINK");
+	EXPECT_STREQ(MountPolicy::DenyMessageId(DenyReason::None), "");
+}
