@@ -735,6 +735,47 @@ def test_tool_page_prompt_mode_has_no_token(dosbox_e2e):
     assert '<script>window.DOSBOX_API_TOKEN=' not in r.text
 
 
+def test_second_engine_on_the_same_port_refuses_to_bind(dosbox, tmp_path):
+    # Two engines sharing one port split the requests between two tokens
+    # (SO_REUSEPORT); the second must fail to bind and say so.
+    import os
+    import subprocess
+    import time
+    from urllib.parse import urlparse
+
+    from conftest import DOSBOX_BIN
+
+    port = urlparse(dosbox._url("/")).port
+    env = {
+        **os.environ,
+        "SDL_VIDEODRIVER": "offscreen",
+        "SDL_AUDIODRIVER": "dummy",
+        "HOME": str(tmp_path),
+        "XDG_CONFIG_HOME": str(tmp_path / ".config"),
+        "DOSBOX_API_TOKEN": "f" * 64,
+    }
+    second = subprocess.Popen(
+        [DOSBOX_BIN, "--noprimaryconf", "--nolocalconf",
+         "--set", "webserver_enabled=true", "--set", f"webserver_port={port}"],
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        cwd=str(tmp_path), text=True,
+    )
+    try:
+        seen = ""
+        deadline = time.time() + 15
+        while time.time() < deadline and "failed to bind" not in seen:
+            line = second.stderr.readline()
+            if not line:
+                break
+            seen += line
+        assert "failed to bind" in seen, seen[-2000:]
+        for _ in range(12):
+            assert dosbox.status().status_code == 200
+    finally:
+        second.kill()
+        second.wait(timeout=10)
+
+
 def test_event_array_size_cap(dosbox):
     giant = [{"type": "key", "key": "KBD_a", "pressed": True}] * 32001
     r = dosbox.input_sequence(giant)

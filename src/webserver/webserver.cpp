@@ -26,6 +26,7 @@
 #include "gui/osd/osd.h"
 #include "gui/osd/osd_port.h"
 
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdint>
@@ -56,6 +57,9 @@
 #include "misc/support.h"
 
 using json = nlohmann::json;
+
+// Set at init, cleared by the webserver thread when the bind fails.
+static void clear_endpoint();
 
 namespace Webserver {
 
@@ -570,12 +574,30 @@ static void run(const std::string addr, const int port,
 	                addr.c_str(),
 	                port);
 
+	// httplib's default adds SO_REUSEPORT, which lets a second engine bind
+	// beside a running one and split its requests; Windows needs the
+	// exclusive flag for the same refusal.
+	server.set_socket_options([](socket_t sock) {
+		int yes = 1;
+#ifdef _WIN32
+		setsockopt(sock,
+		           SOL_SOCKET,
+		           SO_EXCLUSIVEADDRUSE,
+		           reinterpret_cast<const char*>(&yes),
+		           sizeof(yes));
+#else
+		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+#endif
+	});
+
 	auto ok = server.listen(addr, port);
 	if (!ok) {
 		augra::log_warn("webserver",
-		                "failed to bind to %s:%d",
+		                "failed to bind to %s:%d, another instance is "
+		                "probably using the port; the API is off",
 		                addr.c_str(),
 		                port);
+		clear_endpoint();
 	}
 }
 
@@ -661,8 +683,18 @@ static void init_config_settings(SectionProp& section)
 
 } // namespace Webserver
 
-static bool is_webserver_enabled                 = false;
+// Written on the main thread at init and cleared from the webserver
+// thread when the bind fails, read from the emulation thread.
+static std::atomic<bool> is_webserver_enabled = false;
+static std::mutex endpoint_mutex;
 static std::optional<WebserverEndpoint> endpoint = {};
+
+static void clear_endpoint()
+{
+	const std::lock_guard lock(endpoint_mutex);
+	endpoint.reset();
+	is_webserver_enabled = false;
+}
 
 static bool is_remote_address(const std::string& addr)
 {
@@ -701,7 +733,10 @@ void WEBSERVER_Init()
 
 		is_webserver_enabled = true;
 		const auto port      = section->GetInt("webserver_port");
-		endpoint             = WebserverEndpoint{addr, port};
+		{
+			const std::lock_guard lock(endpoint_mutex);
+			endpoint = WebserverEndpoint{addr, port};
+		}
 
 		// Runs before AUTOEXEC_Init, so autoexec MOUNT and BOOT are
 		// covered by the whitelist from the first line onwards.
@@ -756,5 +791,6 @@ bool WEBSERVER_IsEnabled()
 
 std::optional<WebserverEndpoint> WEBSERVER_GetEndpoint()
 {
+	const std::lock_guard lock(endpoint_mutex);
 	return endpoint;
 }
