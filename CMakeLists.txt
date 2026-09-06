@@ -590,7 +590,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 # above) and zlib-ng (see the ZMBV block above). Everything else (libpng,
 # OpenGL, ALSA, SpeexDSP, GTest) stays a system package requirement.
 
-# 3.4.0 floor: upstream mapper code uses SDL_SetDefaultTextureScaleMode
+# 3.4.0 baseline: upstream mapper code uses SDL_SetDefaultTextureScaleMode
 find_package(SDL3 3.4.0 QUIET CONFIG COMPONENTS SDL3)
 if(NOT SDL3_FOUND)
   if(OPT_FETCH_DEPS)
@@ -665,8 +665,17 @@ endif()
 find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED)
 
-# 2.5 floor: upstream midi code uses fluid_synth_set_portamento_time_mode
-find_package(FluidSynth 2.5 QUIET CONFIG)
+# 2.5 baseline: upstream midi code uses fluid_synth_set_portamento_time_mode
+# FluidSynth's config declares SameMinorVersion, so a request for 2.5
+# rejects an installed 2.6. Ask per minor instead; an older install matches
+# none of them and creates no imported target the fetched build would then
+# lose the link to. 3.x is a review, not an automatic accept.
+foreach(fluidsynth_minor 2.5 2.6 2.7 2.8 2.9)
+  find_package(FluidSynth ${fluidsynth_minor} QUIET CONFIG)
+  if(FluidSynth_FOUND)
+    break()
+  endif()
+endforeach()
 if(NOT FluidSynth_FOUND)
   if(OPT_FETCH_DEPS)
     include(FetchContent)
