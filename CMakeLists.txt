@@ -678,43 +678,42 @@ foreach(fluidsynth_minor 2.5 2.6 2.7 2.8 2.9)
 endforeach()
 if(NOT FluidSynth_FOUND)
   if(OPT_FETCH_DEPS)
-    include(FetchContent)
     message(STATUS "FluidSynth 2.5+ not found, fetching from source...")
-    set(enable-tests OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(fluidsynth
-      GIT_REPOSITORY https://github.com/FluidSynth/fluidsynth.git
-      GIT_TAG        v2.5.4
-      GIT_SHALLOW    TRUE
+
+    set(BUILD_SHARED_LIBS OFF)
+    foreach(opt IN ITEMS
+        alsa aufile dbus ipv6 jack ladspa libsndfile midishare network oss
+        dsound wasapi waveout winmidi sdl3 pulseaudio pipewire readline openmp
+        systemd coreaudio coremidi framework dart kai
     )
-    FetchContent_GetProperties(fluidsynth)
-    if(NOT fluidsynth_POPULATED)
-      FetchContent_Populate(fluidsynth)
-      # FluidSynth unconditionally registers its own tests via add_test().
-      # Those tests are EXCLUDE_FROM_ALL (never built by default) so they
-      # show up as ghost failures in ctest. Redirect add_test to a no-op
-      # for the duration of FluidSynth's subdirectory, then restore the
-      # original. Nothing else may go between the two macro() blocks.
-      macro(add_test)
-      endmacro()
-      set(CMAKE_SKIP_INSTALL_RULES ON)
-      add_subdirectory(${fluidsynth_SOURCE_DIR} ${fluidsynth_BINARY_DIR} EXCLUDE_FROM_ALL)
-      set(CMAKE_SKIP_INSTALL_RULES OFF)
-      macro(add_test)
-        _add_test(${ARGN})
-      endmacro()
+      set(enable-${opt} OFF CACHE BOOL "" FORCE)
+    endforeach()
+
+    include(FetchContent)
+    FetchContent_Declare(fluidsynth
+      URL      https://github.com/FluidSynth/fluidsynth/archive/refs/tags/v2.5.7.tar.gz
+      URL_HASH SHA256=ce27840221ab00dd59bf27e85ecbba480c6c2a7c9fbec4243658f68f59c07f4a
+      # FluidSynth unconditionally enables tests, so clobber them
+      PATCH_COMMAND ${CMAKE_COMMAND} -E rm -f test/CMakeLists.txt
+            COMMAND ${CMAKE_COMMAND} -E touch test/CMakeLists.txt
+      SYSTEM
+    )
+    FetchContent_MakeAvailable(fluidsynth)
+    unset(BUILD_SHARED_LIBS)
+    if(TARGET fluidsynth)
+      set_target_properties(fluidsynth PROPERTIES EXCLUDE_FROM_ALL TRUE)
     endif()
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
     if(NOT TARGET FluidSynth::libfluidsynth)
       add_library(FluidSynth::libfluidsynth ALIAS libfluidsynth)
     endif()
   else()
     message(FATAL_ERROR
       "FluidSynth 2.5+ not found. Install it, or pass -DOPT_FETCH_DEPS=ON to download and build automatically.\n"
-      "Note: FluidSynth itself requires glib2 and libsndfile as system packages."
+      "Note: FluidSynth itself requires the glib2 system package."
     )
   endif()
 endif()
+
 if (C_ALSA)
   find_package(ALSA REQUIRED)
 endif()
