@@ -42,6 +42,7 @@ add_executable(dosbox_tests
     webserver_auth_tests.cpp
     webserver_tools_tests.cpp
     webserver_tool_launch_tests.cpp
+    host_browser_tests.cpp
     osd_tests.cpp
     mount_policy_tests.cpp
     lua_engine_tests.cpp

@@ -6,12 +6,11 @@
 
 #include <filesystem>
 
+#include "misc/host_browser.h"
 #include "misc/support.h"
 #include "more_output.h"
 #include "utils/checks.h"
 #include "utils/string_utils.h"
-
-#include <SDL3/SDL.h>
 
 CHECK_NARROWING();
 
@@ -33,12 +32,12 @@ void MANUAL::Run(void)
 
 	if (std::filesystem::exists(path)) {
 		const auto url = std::string{"file://"} + path.string();
-		SDL_OpenURL(url.c_str());
+		HostBrowser::OpenUrl(url);
 
 	} else {
 		const auto url = format_str("https://dosbox-automation.org/%s/manual/",
 		                            DOSBOX_VERSION_SHORT);
-		SDL_OpenURL(url.c_str());
+		HostBrowser::OpenUrl(url);
 	}
 }
 

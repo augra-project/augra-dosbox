@@ -14,6 +14,7 @@
 #include "augra/log.h"
 #include "gui/osd/osd.h"
 #include "gui/private/common.h"
+#include "misc/host_browser.h"
 #include "utils/checks.h"
 
 CHECK_NARROWING();
@@ -58,7 +59,7 @@ WebserverToolLaunchResult WEBSERVER_OpenToolPage(const std::string_view page,
 	if (Webserver::ToolPageSeenWithin(tool, 5s, std::chrono::steady_clock::now())) {
 		return {WebserverToolLaunch::AlreadyOpen, url};
 	}
-	if (!SDL_OpenURL(url.c_str())) {
+	if (!HostBrowser::OpenUrl(url)) {
 		augra::log_warn("webserver",
 		                "could not open %s: %s",
 		                url.c_str(),
