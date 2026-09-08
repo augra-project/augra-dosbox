@@ -16,10 +16,6 @@
 #include "misc/help_util.h"
 #include "shell/command_line.h"
 
-#define WIKI_URL "https://dosbox-automation.org"
-
-#define WIKI_ADD_UTILITIES_ARTICLE WIKI_URL "/manual/"
-
 class Program {
 public:
 	Program();

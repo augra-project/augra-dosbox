@@ -43,6 +43,7 @@ target_sources(dosboxcommon PRIVATE
   programs/boot.cpp
   programs/choice.cpp
   programs/clip.cpp
+  programs/docs_location.cpp
   programs/guide.cpp
   programs/help.cpp
   programs/keyb.cpp

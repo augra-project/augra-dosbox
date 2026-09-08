@@ -6,6 +6,7 @@
 
 #include <filesystem>
 
+#include "dos/programs/docs_location.h"
 #include "misc/host_browser.h"
 #include "misc/support.h"
 #include "more_output.h"
@@ -27,16 +28,14 @@ void MANUAL::Run(void)
 	}
 
 	const auto path = get_resource_path(
-	        format_str("docs/%s/manual/about-this-manual.html",
-	                   DOSBOX_VERSION_SHORT));
+	        DocsLocation::BundledRelativePath("introduction/about-this-manual/"));
 
 	if (std::filesystem::exists(path)) {
 		const auto url = std::string{"file://"} + path.string();
 		HostBrowser::OpenUrl(url);
 
 	} else {
-		const auto url = format_str("https://dosbox-automation.org/%s/manual/",
-		                            DOSBOX_VERSION_SHORT);
+		const auto url = DocsLocation::OnlineUrl("introduction/about-this-manual/");
 		HostBrowser::OpenUrl(url);
 	}
 }
