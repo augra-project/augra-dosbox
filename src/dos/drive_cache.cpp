@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText:  2002-2021 The DOSBox Team
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 dosbox-automation contributors
 
 #include "dos/dos_system.h"
 
@@ -502,35 +503,18 @@ bool DOS_Drive_Cache::RemoveSpaces(char* str) {
 }
 
 void DOS_Drive_Cache::CreateShortName(CFileInfo* curDir, CFileInfo* info) {
-	Bits	len			= 0;
-	bool	createShort = false;
+	const auto basis = sfn_clean_basis(info->orgname);
+	const Bits len = static_cast<Bits>(std::strlen(basis.name));
 
-	// Remove Spaces
-	char tmpNameBuffer[CROSS_LEN];
-	safe_strcpy(tmpNameBuffer, info->orgname);
-	char* tmpName = tmpNameBuffer;
-	upcase(tmpName);
-	createShort = RemoveSpaces(tmpName);
-
-	// Get Length of filename
-	char* pos = strchr(tmpName,'.');
-	if (pos) {
-		// ignore preceding '.' if extension is longer than "3"
-		if (strlen(pos) > 4) {
-			while (*tmpName=='.') tmpName++;
-			createShort = true;
-		}
-		pos = strchr(tmpName,'.');
-		if (pos)
-			len = pos - tmpName;
-		else
-			len = (Bits)strlen(tmpName);
-	} else {
-		len = strlen(tmpName);
+	// Reconstruct the cleaned 8.3 name for collision checks
+	char tmpName[DOS_NAMELENGTH_ASCII];
+	safe_strcpy(tmpName, basis.name);
+	if (basis.ext[0] != '\0') {
+		safe_strcat(tmpName, ".");
+		safe_strcat(tmpName, basis.ext);
 	}
 
-	// Should shortname version be created ?
-	createShort = createShort || (len>8);
+	bool createShort = basis.not_8x3;
 	if (!createShort) {
 		char buffer[CROSS_LEN];
 		safe_strcpy(buffer, tmpName);
@@ -538,54 +522,36 @@ void DOS_Drive_Cache::CreateShortName(CFileInfo* curDir, CFileInfo* info) {
 	}
 
 	if (createShort) {
-		// Create number
 		info->shortNr = CreateShortNameID(curDir, tmpName);
 
-		// If processing a directory containing 10 million or more long files,
-		// then ten duplicate short filenames will be named ~1000000.ext,
-		// another 10 duplicates will be named ~1000001.ext, and so on, back
-		// through to ~9999999.ext if 999,999,999 files are present.
-		// Yes, this is a broken corner-case, but is still memory-safe.
-		// TODO: modify MOUNT/IMGMOUNT to exit with an error when encountering
-		// a directory having more than 65534 files, which is FAT32's limit.
-		char short_nr[8] = {'\0'};
 		if (info->shortNr > 9999999) {
 			E_Exit("~9999999 same name files overflow");
 		}
+		char short_nr[8] = {'\0'};
 		safe_sprintf(short_nr, "%u", info->shortNr);
 
-		// Copy first letters
-		Bits tocopy = 0;
-		size_t buflen = safe_strlen(short_nr);
-		if (len + buflen + 1 > 8)
-			tocopy = (Bits)(8 - buflen - 1);
-		else
-			tocopy = len;
+		// Truncate the name to fit the tilde and number within 8 chars
+		const size_t buflen = safe_strlen(short_nr);
+		Bits tocopy = (len + static_cast<Bits>(buflen) + 1 > 8)
+		            ? static_cast<Bits>(8 - buflen - 1)
+		            : len;
 
-		// Copy the lesser of "DOS_NAMELENGTH_ASCII" or "tocopy + 1" characters.
-		safe_strncpy(info->shortname, tmpName,
+		safe_strncpy(info->shortname, basis.name,
 		             tocopy < DOS_NAMELENGTH_ASCII ? tocopy + 1 : DOS_NAMELENGTH_ASCII);
-		// Copy number
 		safe_strcat(info->shortname, "~");
 		safe_strcat(info->shortname, short_nr);
 
-		// Add (and cut) Extension, if available
-		if (pos) {
-			// Step to last extension...
-			pos = strrchr(tmpName, '.'); // extensions are at-most 3 chars (4 with terminator)
-			// add extension
-			unsigned int remaining_space = DOS_NAMELENGTH_ASCII - safe_strlen(info->shortname) - 1;
-			strncat(info->shortname, pos, 4 < remaining_space ? 4 : remaining_space);
+		if (basis.ext[0] != '\0') {
+			safe_strcat(info->shortname, ".");
+			safe_strcat(info->shortname, basis.ext);
 			info->shortname[DOS_NAMELENGTH] = 0;
 		}
 
 		// keep list sorted for CreateShortNameID to work correctly
 		if (!curDir->longNameList.empty()) {
 			if (!(strcmp(info->shortname,curDir->longNameList.back()->shortname)<0)) {
-				// append at end of list
 				curDir->longNameList.push_back(info);
 			} else {
-				// look for position where to insert this element
 				bool found=false;
 				std::vector<CFileInfo*>::iterator it;
 				for (it=curDir->longNameList.begin(); it!=curDir->longNameList.end(); ++it) {
@@ -594,12 +560,10 @@ void DOS_Drive_Cache::CreateShortName(CFileInfo* curDir, CFileInfo* info) {
 						break;
 					}
 				}
-				// Put it in longname list...
 				if (found) curDir->longNameList.insert(it,info);
 				else curDir->longNameList.push_back(info);
 			}
 		} else {
-			// empty file list, append
 			curDir->longNameList.push_back(info);
 		}
 	} else {
@@ -801,18 +765,27 @@ bool DOS_Drive_Cache::ReadDir(uint16_t id, char* &result) {
 			}
 			return false;
 		}
-		// Read complete directory
+		// Read complete directory, then sort by name so ~N tails
+		// are deterministic across hosts and filesystems.
+		struct DirEntry { std::string name; bool is_dir; };
+		std::vector<DirEntry> entries;
 		char dir_name[CROSS_LEN];
 		bool is_directory;
 		if (read_directory_first(dirp, dir_name, is_directory)) {
-			CreateEntry(dirSearch[id], dir_name, is_directory);
+			entries.push_back({dir_name, is_directory});
 			while (read_directory_next(dirp, dir_name, is_directory)) {
-				CreateEntry(dirSearch[id], dir_name, is_directory);
+				entries.push_back({dir_name, is_directory});
 			}
 		}
-
-		// close dir
 		close_directory(dirp);
+
+		std::sort(entries.begin(), entries.end(),
+		          [](const DirEntry& a, const DirEntry& b) {
+			return a.name < b.name;
+		});
+		for (const auto& e : entries) {
+			CreateEntry(dirSearch[id], e.name.c_str(), e.is_dir);
+		}
 
 		// Info
 /*		if (!dirp) {

@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText:  2021-2026 The DOSBox Staging Team
 // SPDX-FileCopyrightText:  2002-2021 The DOSBox Team
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 dosbox-automation contributors
 
 #include "dos/drives.h"
 
+#include <cstring>
 #include <string_view>
 
 #include "ints/bios_disk.h"
@@ -64,55 +66,161 @@ void Set_Label(const char* const input, char* const output, bool cdrom)
 
 constexpr bool is_special_character(const char c)
 {
-    constexpr auto special_characters = std::string_view("\"+=,;:<>[]|?*");
+    constexpr auto special_characters = std::string_view("\"+=,;:<>[]|?*/\\");
     return special_characters.find(c) != std::string_view::npos;
 }
 
-/* Generate 8.3 names from LFNs, with tilde usage (from ~1 to ~9999). */
-std::string generate_8x3(const char *lfn, const unsigned int num, const bool start)
+static bool is_sfn_illegal(const unsigned char c)
 {
-	unsigned int tilde_limit = 1000000;
-	if (num >= tilde_limit)
-		return "";
-	static std::string result = "";
-	std::string input = lfn;
-	while (input.size() && (input[0] == '.' || input[0] == ' '))
-		input.erase(input.begin());
-	while (input.size() && (input.back() == '.' || input.back() == ' '))
-		input.pop_back();
-	size_t len = 0;
-	auto found = input.rfind('.');
-	unsigned int tilde_pos = 6 - (unsigned int)floor(log10(num));
-	if (num == 1 || start) {
-		result.clear();
-		len = found != std::string::npos ? found : input.size();
-		for (size_t i = 0; i < len; i++) {
-			if (input[i] != ' ') {
-				result += is_special_character(input[i])
-				                  ? "_"
-				                  : std::string(1, toupper(input[i]));
-				if (result.size() >= tilde_pos)
-					break;
-			}
+	if (c < 0x20) return true;
+	if (c == 0x7F) return true;
+	return is_special_character(static_cast<char>(c));
+}
+
+SfnBasis sfn_clean_basis(const char* input)
+{
+	SfnBasis result = {};
+	result.name[0] = '\0';
+	result.ext[0] = '\0';
+	result.lossy = false;
+	result.not_8x3 = false;
+
+	if (!input || !input[0]) {
+		result.name[0] = '_';
+		result.name[1] = '\0';
+		result.lossy = true;
+		result.not_8x3 = true;
+		return result;
+	}
+
+	// "." and ".." pass through as directory entries
+	if (std::strcmp(input, ".") == 0 || std::strcmp(input, "..") == 0) {
+		std::strncpy(result.name, input, 8);
+		result.name[8] = '\0';
+		return result;
+	}
+
+	const char* p = input;
+
+	while (*p == ' ' || *p == '.') ++p;
+	if (p != input) result.not_8x3 = true;
+
+	const char* end = input + std::strlen(input);
+	while (end > p && (end[-1] == ' ' || end[-1] == '.')) --end;
+	if (end != input + std::strlen(input)) result.not_8x3 = true;
+
+	if (p >= end) {
+		result.name[0] = '_';
+		result.name[1] = '\0';
+		result.lossy = true;
+		result.not_8x3 = true;
+		return result;
+	}
+
+	const char* first_dot = nullptr;
+	const char* last_dot = nullptr;
+	for (const char* s = p; s < end; ++s) {
+		if (*s == '.') {
+			if (!first_dot) first_dot = s;
+			last_dot = s;
 		}
 	}
-	result.erase(tilde_pos);
-	result += '~' + std::to_string(num);
-	if (found != std::string::npos) {
-		input.erase(0, found + 1);
-		size_t len_ext = 0;
-		len = input.size();
-		for (size_t i = 0; i < len; i++) {
-			if (input[i] != ' ') {
-				if (!len_ext)
-					result += ".";
-				result += is_special_character(input[i])
-				                  ? "_"
-				                  : std::string(1, toupper(input[i]));
-				if (++len_ext >= 3)
-					break;
+
+	if (first_dot && last_dot && first_dot != last_dot)
+		result.not_8x3 = true;
+
+	const char* prim_end = first_dot ? first_dot : end;
+	const char* ext_start = last_dot ? last_dot + 1 : nullptr;
+	const char* ext_end = last_dot ? end : nullptr;
+
+	// Scan the full input for illegal chars and spaces before the
+	// truncating copy (FATGEN103 replaces over the whole name first).
+	for (const char* s = p; s < prim_end; ++s) {
+		unsigned char c = static_cast<unsigned char>(*s);
+		if (c == ' ') { result.not_8x3 = true; }
+		else if (is_sfn_illegal(c)) { result.lossy = true; result.not_8x3 = true; }
+	}
+	if (ext_start) {
+		for (const char* s = ext_start; s < ext_end; ++s) {
+			unsigned char c = static_cast<unsigned char>(*s);
+			if (c == ' ') { result.not_8x3 = true; }
+			else if (is_sfn_illegal(c)) { result.lossy = true; result.not_8x3 = true; }
+		}
+	}
+
+	int prim_count = 0;
+	for (const char* s = p; s < prim_end; ++s) {
+		if (*s != ' ') ++prim_count;
+	}
+	if (prim_count > 8) result.not_8x3 = true;
+
+	int ext_count = 0;
+	if (ext_start) {
+		for (const char* s = ext_start; s < ext_end; ++s) {
+			if (*s != ' ') ++ext_count;
+		}
+		if (ext_count > 3) result.not_8x3 = true;
+	}
+
+	int ni = 0;
+	for (const char* s = p; s < prim_end && ni < 8; ++s) {
+		unsigned char c = static_cast<unsigned char>(*s);
+		if (c == ' ') continue;
+		if (is_sfn_illegal(c)) {
+			result.name[ni++] = '_';
+		} else if (c >= 'a' && c <= 'z') {
+			result.name[ni++] = static_cast<char>(c - 32);
+		} else {
+			result.name[ni++] = static_cast<char>(c);
+		}
+	}
+	result.name[ni] = '\0';
+
+	if (ext_start) {
+		int ei = 0;
+		for (const char* s = ext_start; s < ext_end && ei < 3; ++s) {
+			unsigned char c = static_cast<unsigned char>(*s);
+			if (c == ' ') continue;
+			if (is_sfn_illegal(c)) {
+				result.ext[ei++] = '_';
+			} else if (c >= 'a' && c <= 'z') {
+				result.ext[ei++] = static_cast<char>(c - 32);
+			} else {
+				result.ext[ei++] = static_cast<char>(c);
 			}
 		}
+		result.ext[ei] = '\0';
+	}
+
+	if (result.name[0] == '\0') {
+		result.name[0] = '_';
+		result.name[1] = '\0';
+		result.lossy = true;
+		result.not_8x3 = true;
+	}
+
+	return result;
+}
+
+/* Generate 8.3 names from LFNs, with tilde usage (from ~1 to ~999999). */
+std::string generate_8x3(const char *lfn, const unsigned int num, const bool /*start*/)
+{
+	constexpr unsigned int tilde_limit = 1000000;
+	if (num == 0 || num >= tilde_limit)
+		return "";
+
+	const auto basis = sfn_clean_basis(lfn);
+
+	const unsigned int tilde_pos = 6 - static_cast<unsigned int>(floor(log10(num)));
+
+	std::string result(basis.name, std::min(static_cast<size_t>(tilde_pos),
+	                                        std::strlen(basis.name)));
+	result += '~';
+	result += std::to_string(num);
+
+	if (basis.ext[0] != '\0') {
+		result += '.';
+		result += basis.ext;
 	}
 	return result;
 }

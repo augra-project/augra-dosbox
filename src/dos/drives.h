@@ -29,6 +29,14 @@ std::string To_Label(const char* name);
 std::string generate_8x3(const char *lfn, const unsigned int num, const bool start = false);
 bool filename_not_8x3(const char *n);
 bool filename_not_strict_8x3(const char *n);
+
+struct SfnBasis {
+	char name[9];
+	char ext[4];
+	bool lossy;    // a character was replaced with underscore
+	bool not_8x3;  // the original name does not fit 8.3 unmodified
+};
+SfnBasis sfn_clean_basis(const char* input);
 char *VFILE_Generate_8x3(const char *name, const unsigned int onpos);
 
 class imageDisk; // forward declare
