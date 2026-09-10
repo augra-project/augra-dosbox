@@ -531,4 +531,9 @@ SectionProp* get_joystick_section();
 SectionProp* get_sdl_section();
 SectionProp* get_mixer_section();
 
+// True if help text contains an unescaped '%s' default-value placeholder.
+// A literal percent is written '%%', so '%%s' is not a placeholder. Exposed
+// for testing the help-escaping rule.
+bool help_has_default_placeholder(const std::string& help_text);
+
 #endif // DOSBOX_SETUP_H

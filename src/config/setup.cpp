@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText:  2019-2026 The DOSBox Staging Team
 // SPDX-FileCopyrightText:  2002-2021 The DOSBox Team
+// SPDX-FileCopyrightText:  2026 dosbox-automation Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "config/setup.h"
@@ -257,6 +258,27 @@ static std::string create_setting_help_msg_name(const std::string& propname)
 	return result;
 }
 
+// A '%s' in help asks GetHelp/GetHelpRaw to substitute the setting's default
+// value. Literal percents are escaped as '%%' (see config.cpp write_property),
+// so '%%s' is a literal "%s" and must not trigger substitution. Match only an
+// unescaped %s.
+bool help_has_default_placeholder(const std::string& help_text)
+{
+	for (size_t i = 0; i + 1 < help_text.size(); ++i) {
+		if (help_text[i] != '%') {
+			continue;
+		}
+		if (help_text[i + 1] == '%') {
+			++i;
+			continue;
+		}
+		if (help_text[i + 1] == 's') {
+			return true;
+		}
+	}
+	return false;
+}
+
 void Property::SetHelp(const std::string& help_text)
 {
 	MSG_Add(create_setting_help_msg_name(propname), help_text);
@@ -291,7 +313,7 @@ std::string Property::GetHelp() const
 		auto help_text = MSG_Get(create_setting_help_msg_name(propname));
 
 		// Fill in the default value if the help text contains '%s'.
-		if (help_text.find("%s") != std::string::npos) {
+		if (help_has_default_placeholder(help_text)) {
 			help_text = format_str(help_text,
 			                       GetDefaultValue().ToString().c_str());
 		}
@@ -340,7 +362,7 @@ std::string Property::GetHelpRaw() const
 		        create_setting_help_msg_name(propname));
 
 		// Fill in the default value if the help text contains '%s'.
-		if (help_text.find("%s") != std::string::npos) {
+		if (help_has_default_placeholder(help_text)) {
 			help_text = format_str(help_text,
 			                       GetDefaultValue().ToString().c_str());
 		}
