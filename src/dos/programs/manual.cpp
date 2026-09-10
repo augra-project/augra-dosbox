@@ -30,13 +30,15 @@ void MANUAL::Run(void)
 	const auto path = get_resource_path(
 	        DocsLocation::BundledRelativePath("introduction/about-this-manual/"));
 
+	std::string url = {};
 	if (std::filesystem::exists(path)) {
-		const auto url = std::string{"file://"} + path.string();
-		HostBrowser::OpenUrl(url);
-
+		url = std::string{"file://"} + path.string();
 	} else {
-		const auto url = DocsLocation::OnlineUrl("introduction/about-this-manual/");
-		HostBrowser::OpenUrl(url);
+		url = DocsLocation::OnlineUrl("introduction/about-this-manual/");
+	}
+	if (!HostBrowser::OpenUrl(url)) {
+		WriteOut("Could not open a browser. Set the BROWSER environment\n"
+		         "variable or the 'browser' setting in the [dosbox] section.\n");
 	}
 }
 
@@ -50,9 +52,9 @@ void MANUAL::AddMessages()
 	        "  [color=light-green]manual[reset]\n"
 	        "\n"
 	        "Notes:\n"
-	        "  - This will open a local offline copy of the user manual guide bundled with\n"
-	        "    your dosbox-automation installation; you don't need an internet connection to\n"
-	        "    read the bundled manual.\n"
+	        "  - This will open a local offline copy of the user manual guide\n"
+	        "    bundled with your dosbox-automation installation; you don't\n"
+	        "    need an internet connection to read the bundled manual.\n"
 	        "\n"
 	        "  - The offline documentation is located in the 'docs' subfolder of your\n"
 	        "    dosbox-automation 'resources' folder.\n"

@@ -812,14 +812,14 @@ static void add_dosbox_config_section(const ConfigPtr& conf)
 	        "  - English is built-in, the rest is stored in the bundled\n"
 	        "    'resources/translations' directory.");
 
-	auto pbrowser = section->AddString("browser", Always, "auto");
-	pbrowser->SetHelp(
+	pstring = section->AddString("browser", Always, "auto");
+	pstring->SetHelp(
 	        "Browser for pages the emulator opens (WORKBENCH, MANUAL, GUIDE);\n"
 	        "'auto' by default uses the system default. Give a browser name\n"
 	        "(firefox, chrome, chromium, brave, edge, librewolf, vivaldi), an\n"
-	        "executable, or a command line where %s stands for the URL; without\n"
-	        "%s the URL is appended. The BROWSER environment variable, when set,\n"
-	        "takes precedence over this setting.");
+	        "executable, or a command line where %%s stands for the URL;\n"
+	        "without %%s the URL is appended. The BROWSER environment\n"
+	        "variable, when set, takes precedence over this setting.");
 
 	pstring = section->AddString("machine", OnlyAtStart, "svga_s3");
 	pstring->SetValues({"hercules",

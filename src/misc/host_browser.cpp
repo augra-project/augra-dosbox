@@ -4,8 +4,6 @@
 
 #include "misc/host_browser.h"
 
-#include <algorithm>
-#include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,6 +15,7 @@
 #include "config/setup.h"
 #include "utils/checks.h"
 #include "utils/env_utils.h"
+#include "utils/string_utils.h"
 
 CHECK_NARROWING();
 
@@ -37,23 +36,14 @@ const std::vector<BrowserName> known_browsers = {
         {  "vivaldi",                       {"vivaldi", "vivaldi-stable"}},
 };
 
-std::string ToLower(const std::string_view text)
-{
-	std::string lower(text);
-	std::ranges::transform(lower, lower.begin(), [](const unsigned char c) {
-		return static_cast<char>(std::tolower(c));
-	});
-	return lower;
-}
-
-void AppendEntry(const std::string_view entry, std::vector<HostBrowser::Argv>& out)
+void append_entry(const std::string_view entry, std::vector<HostBrowser::Argv>& out)
 {
 	const auto words = HostBrowser::SplitCommand(entry);
 	if (words.empty()) {
 		return;
 	}
 	if (words.size() == 1) {
-		const auto lower = ToLower(words[0]);
+		const auto lower = lowcase(words[0]);
 		for (const auto& known : known_browsers) {
 			if (known.name == lower) {
 				for (const auto exe : known.executables) {
@@ -208,12 +198,12 @@ std::vector<HostBrowser::Argv> HostBrowser::Candidates(
 {
 	std::vector<Argv> out = {};
 	for (const auto& entry : SplitBrowserList(env_browser)) {
-		AppendEntry(entry, out);
+		append_entry(entry, out);
 	}
 	const auto conf_words = SplitCommand(conf_browser);
 	if (!conf_words.empty() &&
-	    !(conf_words.size() == 1 && ToLower(conf_words[0]) == "auto")) {
-		AppendEntry(conf_browser, out);
+	    !(conf_words.size() == 1 && lowcase(conf_words[0]) == "auto")) {
+		append_entry(conf_browser, out);
 	}
 	return out;
 }
