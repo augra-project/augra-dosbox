@@ -258,10 +258,8 @@ static std::string create_setting_help_msg_name(const std::string& propname)
 	return result;
 }
 
-// A '%s' in help asks GetHelp/GetHelpRaw to substitute the setting's default
-// value. Literal percents are escaped as '%%' (see config.cpp write_property),
-// so '%%s' is a literal "%s" and must not trigger substitution. Match only an
-// unescaped %s.
+// Help text uses %s for default-value substitution; %%s is a literal
+// "%s" and must not trigger it (see config.cpp write_property).
 bool help_has_default_placeholder(const std::string& help_text)
 {
 	for (size_t i = 0; i + 1 < help_text.size(); ++i) {

@@ -2,20 +2,6 @@
 // License: GPL-2.0-or-later. Contact: dosbox-automation-project@trinity2k.net
 //
 
-// Setting help text is rendered through printf-style functions twice: once in
-// Property::GetHelp/GetHelpRaw (to fill in the default value) and once at the
-// consumer (config -h via MoreOutputStrings::AddString, or the config file
-// writer). A literal percent must be written '%%'. A help text that leaves a
-// live conversion after the first pass crashes the second pass: that was the
-// 'config -h browser' SIGSEGV, where '%%s' was mistaken for a default-value
-// placeholder and de-escaped one pass too early.
-//
-// The unit-test binary links messages_stubs.cpp, so GetHelp cannot be driven
-// here (MSG_Add is a no-op). These tests lock the two pieces that are testable
-// without the message store: the placeholder detector that the fix corrected,
-// and the printf de-escape primitive both render paths rely on. The
-// all-settings render is covered by the config -wc integration test.
-
 #include "config/setup.h"
 
 #include <gtest/gtest.h>
@@ -26,8 +12,6 @@
 
 namespace {
 
-// The exact browser help text (src/dosbox.cpp), kept here so a change there
-// that reintroduces a bad escape is caught by the checks below.
 constexpr const char* BrowserHelp =
         "Browser for pages the emulator opens (WORKBENCH, MANUAL, GUIDE);\n"
         "'auto' by default uses the system default. Give a browser name\n"
@@ -36,12 +20,8 @@ constexpr const char* BrowserHelp =
         "without %%s the URL is appended. The BROWSER environment\n"
         "variable, when set, takes precedence over this setting.";
 
-// Report why a raw help string would break the double-pass render, or an empty
-// string if it is well formed. The rules that keep both passes safe:
-//   - every '%' is either an escaped '%%' or the single '%s' default slot;
-//   - at most one unescaped '%s';
-//   - a '%s' default slot and a '%%' literal cannot coexist, because the first
-//     pass collapses the '%%' too and leaves a lone '%' for the second.
+// Checks the double-format rules: at most one bare %s, no mixing
+// %s with %% (the first pass collapses both), no stray conversions.
 std::string help_escaping_error(const std::string& help)
 {
 	int unescaped_s      = 0;
@@ -80,9 +60,6 @@ std::string help_escaping_error(const std::string& help)
 } // namespace
 
 // ---------------------------------------------------------------------------
-// The placeholder detector, the exact logic the fix corrected. An escaped
-// '%%s' must not read as a default-value placeholder; a bare '%s' must.
-// ---------------------------------------------------------------------------
 
 TEST(ConfigHelpPlaceholder, BarePercentSIsAPlaceholder)
 {
@@ -111,9 +88,6 @@ TEST(ConfigHelpPlaceholder, TrailingPercentIsNotAPlaceholder)
 }
 
 // ---------------------------------------------------------------------------
-// The de-escape primitive. format_str with no arguments is what the consumer
-// applies to help; '%%' must collapse to '%' and a bare '%s' would crash it.
-// ---------------------------------------------------------------------------
 
 TEST(ConfigHelpRender, FormatStrDeEscapesDoublePercentS)
 {
@@ -134,10 +108,6 @@ TEST(ConfigHelpRender, BrowserHelpDeEscapesToLiteralPercentSTwice)
 	EXPECT_EQ(rendered.find("%%s"), std::string::npos);
 }
 
-// ---------------------------------------------------------------------------
-// The authoring-rule validator, tested against known-good and known-bad help
-// so it can be trusted (it mirrors the check the config -wc integration test
-// enforces against every real setting).
 // ---------------------------------------------------------------------------
 
 TEST(ConfigHelpEscaping, AcceptsWellFormedHelp)
