@@ -26,6 +26,8 @@
 // Copyright string
 #define DOSBOX_COPYRIGHT "(C) " DOSBOX_TEAM
 
+#define DOSBOX_PART_NUMBER "SJ-PRG-0486-20260906"
+
 // Website URL
 #define DOSBOX_WEBSITE "https://www.dosbox-automation.org"
 

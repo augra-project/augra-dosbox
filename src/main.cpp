@@ -371,7 +371,7 @@ static void maybe_write_primary_config(const CommandLineArguments& args)
 }
 
 constexpr char version_msg[] =
-        R"(%s, version %s
+        R"(%s, version %s (%s)
 
 Copyright (C) 2026 The dosbox-automation Team
 License: GNU GPL-2.0-or-later <https://www.gnu.org/licenses/gpl-2.0.html>
@@ -385,7 +385,7 @@ static std::optional<int> maybe_handle_command_line_output_only_actions(
         const CommandLineArguments& args, const char* program_name)
 {
 	if (args.version) {
-		printf(version_msg, DOSBOX_PROJECT_NAME, DOSBOX_GetDetailedVersion());
+		printf(version_msg, DOSBOX_PROJECT_NAME, DOSBOX_GetDetailedVersion(), DOSBOX_PART_NUMBER);
 		return 0;
 	}
 	if (args.help) {
@@ -608,7 +608,7 @@ int main(int argc, char* argv[])
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, DOSBOX_COPYRIGHT);			
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, DOSBOX_WEBSITE);			
 
-	LOG_MSG("%s version %s", DOSBOX_PROJECT_NAME, version_string);
+	LOG_MSG("%s version %s (%s)", DOSBOX_PROJECT_NAME, version_string, DOSBOX_PART_NUMBER);
 	LOG_MSG("---");
 
 	LOG_MSG("Loguru version %d.%d.%d initialised",
